@@ -1,0 +1,9 @@
+from models.author import Author  # noqa
+from models.book import Book  # noqa
+from models.buy import Buy  # noqa
+from models.buybook import BuyBook  # noqa
+from models.buystep import BuyStep  # noqa
+from models.city import City  # noqa
+from models.client import Client  # noqa
+from models.genre import Genre  # noqa
+from models.step import Step  # noqa
