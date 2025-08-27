@@ -1,0 +1,141 @@
+version: '3.8'
+
+services:
+  # PostgreSQL база данных
+  postgres:
+    image: postgres:15-alpine
+    container_name: spimex_postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-spimex_user}
+      POSTGRES_PASSWORD: ${DB_PASS:-spimex_password}
+      POSTGRES_DB: postgres
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-spimex_user}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - spimex_network
+
+
+
+  # Инициализация только синхронной базы данных
+  sync-db-init:
+    build:
+      context: .
+      target: sync
+    container_name: spimex_sync_db_init
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-spimex_user}
+      DB_PASS: ${DB_PASS:-spimex_password}
+      SYNC_DB_NAME: ${SYNC_DB_NAME:-spimex_sync}
+      ASYNC_DB_NAME: ${ASYNC_DB_NAME:-spimex_async}
+    command: ["python", "init_db.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spimex_network
+    restart: "no"
+    profiles:
+      - sync-init
+
+  # Инициализация только асинхронной базы данных
+  async-db-init:
+    build:
+      context: .
+      target: async
+    container_name: spimex_async_db_init
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-spimex_user}
+      DB_PASS: ${DB_PASS:-spimex_password}
+      SYNC_DB_NAME: ${SYNC_DB_NAME:-spimex_sync}
+      ASYNC_DB_NAME: ${ASYNC_DB_NAME:-spimex_async}
+    command: ["python", "init_db.py"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spimex_network
+    restart: "no"
+    profiles:
+      - async-init
+
+  # Синхронный парсер
+  sync-parser:
+    build:
+      context: .
+      target: sync
+    container_name: spimex_sync_parser
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-spimex_user}
+      DB_PASS: ${DB_PASS:-spimex_password}
+      SYNC_DB_NAME: ${SYNC_DB_NAME:-spimex_sync}
+      ASYNC_DB_NAME: ${ASYNC_DB_NAME:-spimex_async}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spimex_network
+    profiles:
+      - sync
+
+  # Асинхронный парсер
+  async-parser:
+    build:
+      context: .
+      target: async
+    container_name: spimex_async_parser
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-spimex_user}
+      DB_PASS: ${DB_PASS:-spimex_password}
+      SYNC_DB_NAME: ${SYNC_DB_NAME:-spimex_sync}
+      ASYNC_DB_NAME: ${ASYNC_DB_NAME:-spimex_async}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spimex_network
+    profiles:
+      - async
+
+  # Бенчмарк
+  benchmark:
+    build:
+      context: .
+      target: benchmark
+    container_name: spimex_benchmark
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-spimex_user}
+      DB_PASS: ${DB_PASS:-spimex_password}
+      SYNC_DB_NAME: ${SYNC_DB_NAME:-spimex_sync}
+      ASYNC_DB_NAME: ${ASYNC_DB_NAME:-spimex_async}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - spimex_network
+    profiles:
+      - benchmark
+
+volumes:
+  postgres_data:
+
+networks:
+  spimex_network:
+    driver: bridge

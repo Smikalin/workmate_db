@@ -13,30 +13,28 @@ def generate_dates(start: datetime, end: datetime):
         d += timedelta(days=1)
 
 
-if __name__ == "__main__":
-    # Полная загрузка с января 2023 года
+def sync_main():
     start_date = datetime(2023, 1, 1)
     end_date = datetime.now()
 
-    print("🏦 SPIMEX Парсер - Массовая загрузка данных")
+    print("🏦 SPIMEX Синхронный Парсер - Массовая загрузка данных")
     print("=" * 70)
     print(
         f"📅 Период: с {start_date.strftime(DATE_FORMAT)} "
         f"по {end_date.strftime(DATE_FORMAT)}"
     )
+    print("🔄 Режим: Синхронная обработка")
+    print("📊 База данных: spimex_sync_db")
     print("=" * 70)
 
-    # Очищаем кэш страниц перед началом работы
     clear_page_cache()
     print("🗑️ Кэш страниц очищен")
 
     processed_count = 0
     success_count = 0
 
-    # Создаем список дат для подсчета общего количества
     dates_list = list(generate_dates(start_date, end_date))
 
-    # Используем tqdm для отображения прогресса
     for date_str in tqdm(dates_list, desc="Обработка дат", unit="дата"):
         processed_count += 1
 
@@ -48,9 +46,13 @@ if __name__ == "__main__":
             tqdm.write(f"❌ {date_str} - ошибка: {e}")
 
     print("\n" + "=" * 70)
-    print("🏁 Загрузка завершена!")
+    print("🏁 Синхронная загрузка завершена!")
     print("📊 Статистика:")
     print(f"   • Обработано дат: {processed_count}")
     print(f"   • Успешно загружено: {success_count}")
     print(f"   • Ошибок: {processed_count - success_count}")
     print("=" * 70)
+
+
+if __name__ == "__main__":
+    sync_main()

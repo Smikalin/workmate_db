@@ -1,8 +1,10 @@
 pandas
 sqlalchemy
 psycopg2-binary
+asyncpg
 python-dotenv
 requests
+aiohttp
 alembic
 xlrd
 tqdm

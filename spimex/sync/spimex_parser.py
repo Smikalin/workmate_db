@@ -23,8 +23,6 @@ from constants import (
 )
 
 
-# Глобальный кэш для оптимизации поиска по страницам
-# Структура: {page_num: {'first_date': str, 'last_date': str}}
 PAGE_CACHE: dict = {}
 
 
@@ -92,6 +90,16 @@ def extract_metric_ton_data(file_content, date_str):
 
         df_filtered = df_filtered.dropna(subset=NUMERIC_COLUMNS, how="all")
 
+        df_filtered = df_filtered[df_filtered["exchange_product_id"].notna()]
+        df_filtered = df_filtered[
+            ~df_filtered["exchange_product_id"]
+            .astype(str)
+            .str.contains("Итого", na=False)
+        ]
+        df_filtered = df_filtered[
+            df_filtered["exchange_product_id"].astype(str) != "nan"
+        ]
+
         return df_filtered
 
     except Exception as e:
@@ -126,14 +134,12 @@ def find_url_for_date(target_date: str):
         date_obj = datetime.strptime(target_date, DATE_FORMAT)
         date_formatted = date_obj.strftime(DATE_FORMAT_SPIMEX)
 
-        # Сначала проверяем первую страницу
         file_url, file_response, last_date, first_date = search_in_page(
             BASE_URL, date_formatted, page_num=1
         )
         if file_url:
             return file_url, file_response
 
-        # Затем ищем с последней страницы к началу
         page_range = list(range(MAX_PAGES_TO_CHECK, 1, -1))
         for page_num in tqdm(
             page_range,
@@ -145,12 +151,9 @@ def find_url_for_date(target_date: str):
                 page_url, date_formatted, page_num
             )
 
-            # Проверяем, нужно ли прекратить поиск
             if last_date and last_date > date_formatted:
                 break
 
-            # Если дата первого файла на странице меньше искомой,
-            # то файл не может быть на этой странице, переходим на следующую
             if first_date and first_date < date_formatted:
                 continue
 
@@ -171,18 +174,14 @@ def search_in_page(page_url: str, date_formatted: str, page_num: int):
     """
     global PAGE_CACHE
 
-    # Проверяем кэш для этой страницы
     if page_num in PAGE_CACHE:
         cached_data = PAGE_CACHE[page_num]
         first_file_date = cached_data["first_date"]
         last_file_date = cached_data["last_date"]
 
-        # Если первый файл на странице старше искомой даты,
-        # то файл точно не может быть на этой странице
         if first_file_date and first_file_date < date_formatted:
             return None, None, last_file_date, first_file_date
     else:
-        # Страница не в кэше, загружаем её
         try:
             response = requests.get(page_url, timeout=HTTP_TIMEOUT)
 
@@ -191,20 +190,15 @@ def search_in_page(page_url: str, date_formatted: str, page_num: int):
 
             html_content = response.text
 
-            # Ищем все файлы Excel на странице для определения позиции
             all_files_pattern = ALL_FILES_PATTERN
             all_matches = re.findall(all_files_pattern, html_content)
 
-            # Извлекаем даты первого и последнего файлов на странице
             first_file_date = None
             last_file_date = None
             if all_matches:
-                # Первый файл в списке - самый новый по дате
-                first_file_date = all_matches[0][1]  # Берем группу с датой
-                # Последний файл в списке - самый старый по дате
-                last_file_date = all_matches[-1][1]  # Берем группу с датой
+                first_file_date = all_matches[0][1]
+                last_file_date = all_matches[-1][1]
 
-                # Сохраняем в кэш
                 PAGE_CACHE[page_num] = {
                     "first_date": first_file_date,
                     "last_date": last_file_date,
@@ -212,13 +206,9 @@ def search_in_page(page_url: str, date_formatted: str, page_num: int):
         except Exception:
             return None, None, None, None
 
-        # Если первый файл на странице старше искомой даты,
-        # то файл точно не может быть на этой странице
         if first_file_date and first_file_date < date_formatted:
             return None, None, last_file_date, first_file_date
 
-    # Если мы дошли до этого места, нужно искать файл на странице
-    # Для этого нужно загрузить страницу, если она не была загружена
     if page_num not in PAGE_CACHE:
         try:
             response = requests.get(page_url, timeout=HTTP_TIMEOUT)
@@ -228,7 +218,6 @@ def search_in_page(page_url: str, date_formatted: str, page_num: int):
         except Exception:
             return None, None, None, None
     else:
-        # Страница была в кэше, но нужно перезагрузить для поиска файла
         try:
             response = requests.get(page_url, timeout=HTTP_TIMEOUT)
             if response.status_code != 200:
@@ -237,7 +226,6 @@ def search_in_page(page_url: str, date_formatted: str, page_num: int):
         except Exception:
             return None, None, first_file_date, last_file_date
 
-    # Ищем конкретный файл для нужной даты
     pattern = FILE_URL_PATTERN.format(date_formatted=date_formatted)
     target_matches = re.findall(pattern, html_content)
 
@@ -291,14 +279,12 @@ def parse_bulletin_for_date(date_str: str, max_retries=3):
         print(f"📄 Не удалось прочитать Excel файл на {date_str}")
         return
 
-    # Находим секцию "Метрическая тонна"
     df_metric_ton = extract_metric_ton_data(response.content, date_str)
 
     if df_metric_ton is None or df_metric_ton.empty:
         print(f"ℹ️ Данных по метрической тонне нет на {date_str}")
         return
 
-    # Фильтруем по количеству договоров > 0
     df_metric_ton = df_metric_ton[df_metric_ton["count"] > 0]
 
     if df_metric_ton.empty:
@@ -307,9 +293,6 @@ def parse_bulletin_for_date(date_str: str, max_retries=3):
 
     df = df_metric_ton
 
-    # Столбцы уже переименованы в extract_metric_ton_data
-
-    # Извлекаем дополнительные поля из exchange_product_id
     df["oil_id"] = df["exchange_product_id"].str[:4]
     df["delivery_basis_id"] = df["exchange_product_id"].str[4:7]
     df["delivery_type_id"] = df["exchange_product_id"].str[-1]
@@ -321,10 +304,8 @@ def parse_bulletin_for_date(date_str: str, max_retries=3):
 
     records = df[RECORDS_TO_SAVE].to_dict(orient="records")
 
-    # Сохраняем в базу данных с проверкой на дублирование
     session = SessionLocal()
     try:
-        # Проверяем, есть ли уже данные за эту дату
         existing_count = (
             session.query(TradingResult)
             .filter(TradingResult.date == pd.to_datetime(date_str).date())
@@ -337,7 +318,6 @@ def parse_bulletin_for_date(date_str: str, max_retries=3):
             )
             return
 
-        # Если данных нет, добавляем новые записи
         session.bulk_insert_mappings(TradingResult.__mapper__, records)
         session.commit()
         print(f"✅ Загружено записей: {len(records)}")
