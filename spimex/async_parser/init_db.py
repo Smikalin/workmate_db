@@ -9,9 +9,9 @@ from models.trading_result import TradingResult
 
 def create_database_if_not_exists():
     """Создает базу данных если она не существует (синхронная операция)"""
-    # Конвертируем asyncpg URL в psycopg2 для создания БД
     sync_url = ASYNC_SQLALCHEMY_DATABASE_URL.replace(
-        "postgresql+asyncpg://", "postgresql+psycopg2://"
+        "postgresql+asyncpg://",
+        "postgresql+psycopg2://",
     )
 
     base_url = sync_url.rsplit("/", 1)[0]
@@ -34,7 +34,9 @@ def create_database_if_not_exists():
 
     except OperationalError as e:
         print(f"❌ Ошибка подключения к PostgreSQL: {e}")
-        print("💡 Убедитесь, что PostgreSQL запущен и настройки подключения корректны")
+        print(
+            "💡 Убедитесь, что PostgreSQL запущен и настройки подключения корректны",
+        )
         return False
     except Exception as e:
         print(f"❌ Ошибка при создании базы данных '{DB_NAME}': {e}")
@@ -47,12 +49,10 @@ async def init_async_database():
     """Создает базу данных и асинхронно создает все таблицы"""
     print("🚀 Инициализация асинхронной базы данных...")
 
-    # Сначала создаем базу данных синхронно
     if not create_database_if_not_exists():
         print("❌ Не удалось создать базу данных")
         sys.exit(1)
 
-    # Затем создаем таблицы асинхронно
     try:
         async with async_engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)

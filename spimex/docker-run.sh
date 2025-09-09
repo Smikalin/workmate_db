@@ -26,6 +26,7 @@ show_help() {
     echo "  init-all   - Инициализация обеих баз данных"
     echo "  sync       - Запуск синхронного парсера"
     echo "  async      - Запуск асинхронного парсера"
+    echo "  api        - Запуск API микросервиса"
     echo "  benchmark  - Запуск бенчмарка"
     echo "  stop       - Остановка всех контейнеров"
     echo "  clean      - Удаление всех контейнеров и образов"
@@ -37,6 +38,7 @@ show_help() {
     echo "  $0 build && $0 start && $0 init-all"
     echo "  $0 init-sync && $0 sync"
     echo "  $0 init-async && $0 async"
+    echo "  $0 init-async && $0 api"
     echo "  $0 benchmark"
     echo "  $0 logs sync-parser"
 }
@@ -68,6 +70,14 @@ run_sync() {
 run_async() {
     echo -e "${GREEN}⚡ Запуск асинхронного парсера...${NC}"
     docker-compose --env-file docker.env --profile async up async-parser
+}
+
+# Функция для запуска API микросервиса
+run_api() {
+    echo -e "${GREEN}🚀 Запуск API микросервиса...${NC}"
+    echo -e "${YELLOW}📡 API будет доступен на http://localhost:18000${NC}"
+    echo -e "${YELLOW}📖 Документация: http://localhost:18000/docs${NC}"
+    docker-compose --env-file docker.env --profile api up redis api
 }
 
 # Функция для запуска бенчмарка
@@ -109,7 +119,7 @@ show_status() {
 enter_shell() {
     if [ -z "$2" ]; then
         echo -e "${RED}❌ Укажите имя контейнера${NC}"
-        echo "Доступные контейнеры: postgres, sync-parser, async-parser"
+        echo "Доступные контейнеры: postgres, redis, sync-parser, async-parser, api"
         exit 1
     fi
     docker-compose --env-file docker.env exec "$2" /bin/bash
@@ -144,6 +154,9 @@ case "${1:-help}" in
         ;;
     async)
         run_async
+        ;;
+    api)
+        run_api
         ;;
     benchmark)
         run_benchmark

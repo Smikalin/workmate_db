@@ -61,7 +61,9 @@ def extract_metric_ton_data(file_content, date_str):
 
         header_row = metric_ton_row + 1
         df_section = pd.read_excel(
-            BytesIO(file_content), engine=EXCEL_ENGINE, header=header_row
+            BytesIO(file_content),
+            engine=EXCEL_ENGINE,
+            header=header_row,
         )
 
         df_section.columns = [
@@ -83,14 +85,15 @@ def extract_metric_ton_data(file_content, date_str):
         df_filtered = df_filtered[df_filtered[code_col].astype(str).str.len() > 3]
 
         df_filtered = df_filtered.rename(
-            columns={v: k for k, v in column_mapping.items()}
+            columns={v: k for k, v in column_mapping.items()},
         )
 
         numeric_columns = NUMERIC_COLUMNS
         for col in numeric_columns:
             if col in df_filtered.columns:
                 df_filtered[col] = pd.to_numeric(
-                    df_filtered[col].replace("-", None), errors="coerce"
+                    df_filtered[col].replace("-", None),
+                    errors="coerce",
                 )
 
         df_filtered = df_filtered.dropna(subset=NUMERIC_COLUMNS, how="all")
@@ -136,7 +139,10 @@ async def find_url_for_date(session: aiohttp.ClientSession, target_date: str):
         date_formatted = date_obj.strftime(DATE_FORMAT_SPIMEX)
 
         file_url, file_response, last_date, first_date = await search_in_page(
-            session, BASE_URL, date_formatted, page_num=1
+            session,
+            BASE_URL,
+            date_formatted,
+            page_num=1,
         )
         if file_url:
             return file_url, file_response
@@ -145,10 +151,11 @@ async def find_url_for_date(session: aiohttp.ClientSession, target_date: str):
 
         for page_num in page_range:
             page_url = BASE_URL + PAGE_URL_PATTERN.format(page_num=page_num)
-            file_url, file_response, last_date, first_date = (
-                await search_in_page(
-                    session, page_url, date_formatted, page_num
-                )
+            file_url, file_response, last_date, first_date = await search_in_page(
+                session,
+                page_url,
+                date_formatted,
+                page_num,
             )
 
             if last_date and last_date > date_formatted:
@@ -168,7 +175,10 @@ async def find_url_for_date(session: aiohttp.ClientSession, target_date: str):
 
 
 async def search_in_page(
-    session: aiohttp.ClientSession, page_url: str, date_formatted: str, page_num: int
+    session: aiohttp.ClientSession,
+    page_url: str,
+    date_formatted: str,
+    page_num: int,
 ):
     """
     Асинхронно ищет файл на конкретной странице
@@ -185,7 +195,8 @@ async def search_in_page(
     else:
         try:
             async with session.get(
-                page_url, timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
+                page_url,
+                timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT),
             ) as response:
                 if response.status != 200:
                     return None, None, None, None
@@ -213,7 +224,8 @@ async def search_in_page(
 
     try:
         async with session.get(
-            page_url, timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
+            page_url,
+            timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT),
         ) as response:
             if response.status != 200:
                 return (
@@ -244,7 +256,8 @@ async def search_in_page(
 
         try:
             async with session.get(
-                file_url, timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
+                file_url,
+                timeout=aiohttp.ClientTimeout(total=HTTP_TIMEOUT),
             ) as file_response:
                 if file_response.status == 200:
                     file_content = await file_response.read()
@@ -359,7 +372,8 @@ async def parse_multiple_dates(date_strings: list, max_concurrent: int = 50):
     timeout = aiohttp.ClientTimeout(total=HTTP_TIMEOUT)
 
     async with aiohttp.ClientSession(
-        connector=connector, timeout=timeout
+        connector=connector,
+        timeout=timeout,
     ) as session:
         semaphore = asyncio.Semaphore(max_concurrent)
 

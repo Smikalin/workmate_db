@@ -133,8 +133,58 @@ services:
     profiles:
       - benchmark
 
+  # Redis для кэширования API
+  redis:
+    image: redis:7-alpine
+    container_name: spimex_redis
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - spimex_network
+    profiles:
+      - api
+
+  # API микросервис
+  api:
+    build:
+      context: .
+      target: api
+    container_name: spimex_api
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-spimex_user}
+      DB_PASS: ${DB_PASS:-spimex_password}
+      ASYNC_DB_NAME: ${ASYNC_DB_NAME:-spimex_async}
+      REDIS_URL: redis://redis:6379/0
+      HOST: 0.0.0.0
+      PORT: 8000
+      DEBUG: ${API_DEBUG:-false}
+      LOG_LEVEL: ${API_LOG_LEVEL:-INFO}
+    ports:
+      - "18000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - spimex_network
+    profiles:
+      - api
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  redis_data:
 
 networks:
   spimex_network:
